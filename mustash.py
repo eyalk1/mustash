@@ -8,13 +8,17 @@ REC_FILENAME = "recs.json"
 PROMPT = ">>> "
 TEMPI = ["fast", "mid", "slow"]
 
-
-def get_name():
-    return input(">>> name - ")
+"""
+    TODO:
+1. make input nicer
+2. catch exceptions
+3. add search and view
+4. when lsing print everything that is relevant(i.e. view)
+"""
 
 
 def get_tempo():
-    return get_from_options("tempo", ["slow", "midium", "fast"])
+    return get_from_options("tempo", ["slow", "medium", "fast"])
 
 
 def get_files_from_curdir(filetype: str, pred):
@@ -27,7 +31,7 @@ def get_files_from_curdir(filetype: str, pred):
             os.listdir(),
         )
     )
-    return get_from_options(filetype, files)
+    return get_from_options(filetype, files,accept_empty=True)
 
 
 def get_chords():
@@ -35,6 +39,7 @@ def get_chords():
 
 
 def get_feels():
+    # TODO: change to get from options and add energy level
     return get_until_empty("feels")
 
 
@@ -42,7 +47,6 @@ def get_time_signature():
     return get_until_empty("time signature")
 
 def add_new_composition(rec_file):
-    name = get_name()
     tempo = get_tempo()
     audio_file = get_files_from_curdir(
         "audio_file",
@@ -57,7 +61,7 @@ def add_new_composition(rec_file):
     chords = get_chords()
     has_line = (
         True
-        if get_from_options("has line", ["yes", "no"]) == "yes"
+        if get_from_options("has line", ["yes", "no"], default='no') == "yes"
         else False
     )
     feel = get_feels()
@@ -68,7 +72,6 @@ def add_new_composition(rec_file):
     length = int(input(">>> length - "))
     time_signature = get_time_signature()
     return {
-        "name": name,
         "tempo": tempo,
         "audio_file": audio_file,
         "score_file": score_file,
@@ -81,36 +84,43 @@ def add_new_composition(rec_file):
         "time_signature": time_signature,
     }
 
-def get_recs_names(recs):
-    return [r["name"] for r in recs]
+def get_recs_chords(recs):
+    return [r["chords"] for r in recs]
+    
+def save_recs(recs):
+    json.dump(recs, open(REC_FILENAME, "w"))
     
 
 def main():
-    rec_file = json.load(open(REC_FILENAME))
+    rec_file = json.load(open(REC_FILENAME)) if os.path.isfile(REC_FILENAME) else []
 
     cmd = ''
     while cmd != "q":
-        cmd = input(PROMPT)
+        cmd = input(PROMPT).strip()
         match cmd:
             case "ls":
-                print('\n'.join(get_recs_names(rec_file)))
+                for chords in get_recs_chords(rec_file):
+                    print(chords)
             case "search":
                 pass
             case "add":
                 rec_file.append(add_new_composition(rec_file))
             case "rm":
-                delete = get_from_options("recs", get_recs_names(rec_file))
+                delete = get_from_options("recs", get_recs_chords(rec_file))
                 rec_file = list(filter(lambda rec:rec["name"] != delete, rec_file))
             case "play":
-                play = get_from_options("recs", get_recs_names(rec_file))
+                play = get_from_options("recs", get_recs_chords(rec_file))
                 for rec in rec_file:
                     if rec["name"] == play:
                         playsound(rec["audio_file"])
             case "edit":
                 pass
+            case "save":
+                save_recs(rec_file)
+            case "help":
+                print("""\tls - see all recordings\n\tsearch - query for recordings\n\tadd - add new recording\n\tsave - save to db\n\trm - delete recording(only from db)\n\tplay - play recording\n\tedit - edit recrding's metadata\n\tq - quit\n\thelp - this help""")
             case "q":
-                print(rec_file)
-                json.dump(rec_file, open(REC_FILENAME, "w"))
+                save_recs(rec_file)
 
 
 def dowhile(action, check, accumulate=False):
@@ -125,16 +135,27 @@ def dowhile(action, check, accumulate=False):
     return thing
 
 
-def get_from_options(category_name, options, add_new=False):
+def get_from_options(category_name, options, add_new=False, accept_empty=False,default=''):
+    if default not in options and default != '':
+        raise 5
     if add_new:
         options.append("new")
     prompt_prefix = f">>> {category_name} - "
-    optionlist = "\n".join([f"\t{n} - {option}" for n, option in enumerate(options)])
+    optionlist = "\n".join([f"\t{n} - {'['if option == default else ''}{option}{']' if option == default else ''}" for n, option in enumerate(options)])
     prompt = f"{prompt_prefix}\n{optionlist}\n{PROMPT}"
-    result = dowhile(lambda: int(input(prompt)), lambda answer: answer < len(options))
-    if not add_new or result < len(options) - 1:
-        return options[result]
-    return input(f"enter new {category_name} - ")
+
+    result = None
+    while True:
+        result = input(prompt)
+        if (default != '' or accept_empty) and result == '':
+                return default
+        result = int(result)
+        print(result)
+        if result < len(options):
+            if options[result] == "new":
+                return input(f"enter new {category_name} - ")
+            return options[int(result)]
+        print("try again retard")
 
 
 def get_until_empty(category):
