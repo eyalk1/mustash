@@ -1,0 +1,109 @@
+Negative emtions
+	Low Arousal
+		Sadness
+			Grief
+			Despair
+			Loneliness
+			Isolation
+			Hopelessness
+			Worthless
+			Helpless
+		Boredom
+			Apathy
+			Empty
+			Indifferent
+			Unfocused
+			Tired
+		Shame
+			Humiliated
+			Embarrassed
+			Ashamed
+			Guilty
+			Remorseful
+	High Arousal
+		Fear
+			Scared
+			Frightened
+			Anxious
+			Terrified
+			Panic
+			Worried
+			Apprehensive
+			Out of Control
+			Fragile
+			Vulnerable
+		Anger
+			Rage
+			Fury
+			Hostile
+			Furious
+			Mad
+			Infuriated
+			Annoyed
+			Frustrated
+			Resentful
+			Bitter
+			Indignant
+		Disgust
+			Disgusted
+			Repelled
+			Revulsion
+			Nauseated
+			Detestable
+Positive Emotions
+	Low Arousal
+		Contentment
+			Peaceful
+			Relaxed
+			Satisfied
+			Secure
+		Love
+			Loving
+			Trusting
+			Intimate
+			Affectionate
+	High Arousal
+		Joy
+			Happy
+			Joyful
+			Excited
+			Playful
+			Energetic
+		Hope
+			Optimistic
+			Inspired
+			Hopeful
+	Other
+		Neutral (unrelated to emotional state)
+			Sleepy
+			Surprised
+			Astonished
+			Amazed
+			Curious
+			Interested
+		Cognitive States
+			Perplexed
+			Confused
+			Critical
+			Skeptical
+			Disapproving
+			Judgmental
+		Social States
+			Rejected
+			Excluded
+			Distant
+			Withdrawn
+			Numb
+			Accepted
+			Respected
+			Valued
+		Motivational States
+			Eager
+			Pressured
+			Busy
+			Rushed
+			Creative
+		Behavioral States
+			Withdrawn
+			Critical
+			Aroused
