@@ -14,8 +14,6 @@ TEMPI = ["fast", "mid", "slow"]
 
 """
     TODO:
-1. make input nicer
-    2. handle used
 3. add search and view
 5. split to files
 4. when lsing print everything that is relevant(i.e. view)
@@ -31,7 +29,7 @@ def try_until_good(func, *args, **kwargs):
 
 
 def get_tempo():
-    try_until_good(get_from_options, "tempo", ["slow", "medium", "fast"])
+    return get_from_options("tempo",["slow","medium","fast"])
 
 
 def get_files_from_curdir(filetype: str, pred):
@@ -53,18 +51,20 @@ def get_chords():
 
 def get_feels():
     keys_list = list(EMOTIONS.keys())
-    choices = []
+    final_choices = []
     while True:
-        choice = get_from_options("feels", keys_list, accept_empty=True)
-        if choice == "":
+        # pdb.set_trace()
+        choices = get_from_options("feels", keys_list, accept_empty=True)
+        if choices == [""]:
             break
-        pdb.set_trace()
-        choices.append(get_from_options(choice, EMOTIONS[choice], accept_empty=True))
-        if choices[-1] == "":
-            choices = choices[:-1]
+        for choice in choices:
+            for emotion in get_from_options(choice, EMOTIONS[choice], accept_empty=True):
+                final_choices.append(emotion)
+        if len(final_choices) > 0 and final_choices[-1] == [""]:
+            final_choices = final_choices[:-1]
             break
 
-    return choices
+    return final_choices
 
 
 def get_time_signature():
@@ -109,23 +109,18 @@ def add_new_composition(rec_file):
         "score_file", partial(check_audio_file, rec_file, SCORE_FORMATS)
     )
     chords = get_chords()
-    has_line = (
-        True
-        if get_from_options("has line", ["no", "yes"], default="no") == "yes"
-        else False
-    )
+    has_line = True if get_from_options("has line", ["no", "yes"], default="no") == ["yes"] else False
+    
     feel = get_feels()
     composer = get_from_options(
         "composer", list(set(rec["composer"] for rec in rec_file)), add_new=True
     )
     used = get_from_options(
         "compsitions using this progression",
-        chain(*map(lambda rec: rec["used"], rec_file)),
+        list(chain(*map(lambda rec: rec["used"], rec_file))),
         add_new=True,
         accept_empty=True,
-        allow_multiple=True,
     )
-    # used = set(get_until_empty("compsitions using this progression", chain(*map(lambda rec: rec["used"], rec_file))))
     length = try_until_good(get_length)
     time_signature = get_time_signature()
     return {
@@ -208,8 +203,9 @@ def get_from_options(
     add_new=False,
     accept_empty=False,
     default="",
-    allow_multiple=False,
 ):
+    accept_empty = accept_empty or default != ""
+    ALLOW_MULTIPLE_NOTIFY_MSG = "(enter space seperated list if multiple choices)"
     if default not in options and default != "":
         raise ValueError("default value has to be one of the options if it is given")
     elif default != "" and default in options:
@@ -218,39 +214,34 @@ def get_from_options(
         )
     if add_new:
         options.append("new")
-    prompt_prefix = f">>> {category_name} - "
+    prompt_prefix = f">>> {category_name} - {ALLOW_MULTIPLE_NOTIFY_MSG}"
     optionlist = "\n".join([f"\t{n} - {option}" for n, option in enumerate(options)])
     prompt = f"{prompt_prefix}\n{optionlist}\n{PROMPT}"
 
-    def get_input(
-        category_name,
-        options,
-        add_new=False,
-        accept_empty=False,
-        default="",
-        allow_multiple=False,
-    ):
-        result = None
-        while True:
-            result = input(prompt)
-            if result == "":
-                if default != "" or accept_empty:
-                    return default
-                else:
-                    continue
-            if not result.isdigit():
-                continue
-            result = int(result)
-            if result < len(options):
-                if options[result] == "new":
-                    return input(f"enter new {category_name} - ")
-                return options[result]
-            print("try again retard")
+    result = None
+    while True:
+        result = input(prompt)
+        if result == "" and not accept_empty:
+            print("please try again retard")
+            continue
+        if not all(map(lambda x: x.isdigit(), result.split())):
+            print("please try again retard")
+            continue
+        results = list(map(int, result.split()))
+        if not all(map(lambda x: x < len(options), results)):
+            print("please try again retard")
+            continue
 
-    if allow_multiple:
-        i = get_input()
-    else:
-        return get_input()
+        if result == "" and accept_empty:
+            return [default]
+
+        text_results = []
+        for entry in results:
+            if options[entry] == "new":
+                text_results.append(input(f"enter new {category_name} - "))
+            else:
+                text_results.append(options[entry])
+        return text_results
 
 
 def get_until_empty(category, options="", check=None):
