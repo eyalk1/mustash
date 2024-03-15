@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import itertools
 import json
 import os
 import pdb
@@ -7,63 +8,48 @@ from audio_formats import AUDIO_FORMATS, SCORE_FORMATS
 from emotions import EMOTIONS
 from functools import partial
 from itertools import chain
+from utils import (
+    get_from_options,
+    get_until_empty,
+    not_empty,
+    try_until_good,
+    get_files_from_curdir,
+    get_attr,
+)
+from common import PROMPT, REC_FILENAME
 
-REC_FILENAME = "recs.json"
-PROMPT = ">>> "
 TEMPI = ["fast", "mid", "slow"]
 
 """
     TODO:
-3. add search and view
-5. split to files
-4. when lsing print everything that is relevant(i.e. view)
+1. make audio playing seekable
+2. 
 """
 
 
-def try_until_good(func, *args, **kwargs):
-    while True:
-        try:
-            return func(*args, **kwargs)
-        except ValueError:
-            print("try again")
-
-
 def get_tempo():
-    return get_from_options("tempo",["slow","medium","fast"])
-
-
-def get_files_from_curdir(filetype: str, pred):
-    files = list(
-        filter(
-            lambda filename: filename != "mustash.py"
-            and filename != REC_FILENAME
-            and os.path.isfile(filename)
-            and pred(filename),
-            os.listdir(),
-        )
-    )
-    return get_from_options(filetype, files, accept_empty=True)
+    return get_from_options("tempo", ["slow", "medium", "fast"])
 
 
 def get_chords():
-    return get_until_empty("chords")
+    return [s.split() for s in get_until_empty("chords")]
 
 
 def get_feels():
     keys_list = list(EMOTIONS.keys())
     final_choices = []
     while True:
-        # pdb.set_trace()
         choices = get_from_options("feels", keys_list, accept_empty=True)
         if choices == [""]:
             break
         for choice in choices:
-            for emotion in get_from_options(choice, EMOTIONS[choice], accept_empty=True):
+            for emotion in get_from_options(
+                choice, EMOTIONS[choice], accept_empty=True
+            ):
                 final_choices.append(emotion)
         if len(final_choices) > 0 and final_choices[-1] == [""]:
             final_choices = final_choices[:-1]
             break
-
     return final_choices
 
 
@@ -82,7 +68,9 @@ def get_time_signature():
         return True
 
     while True:
-        sigs: list[str] = get_until_empty("time signature")
+        sigs = input(
+            f"{PROMPT}enter space separated list of time signature - \n\t"
+        ).split()
         if all(map(check_signature, sigs)):
             break
 
@@ -109,15 +97,21 @@ def add_new_composition(rec_file):
         "score_file", partial(check_audio_file, rec_file, SCORE_FORMATS)
     )
     chords = get_chords()
-    has_line = True if get_from_options("has line", ["no", "yes"], default="no") == ["yes"] else False
-    
+    has_line = (
+        True
+        if get_from_options("has line", ["no", "yes"], default="no") == ["yes"]
+        else False
+    )
+
     feel = get_feels()
     composer = get_from_options(
-        "composer", list(set(rec["composer"] for rec in rec_file)), add_new=True
+        "composer",
+        list(set(e for rec in rec_file for e in rec["composer"])),
+        add_new=True,
     )
     used = get_from_options(
         "compsitions using this progression",
-        list(chain(*map(lambda rec: rec["used"], rec_file))),
+        list(set(e for rec in rec_file for e in rec["used"])),
         add_new=True,
         accept_empty=True,
     )
@@ -147,8 +141,108 @@ def save_recs(recs):
 
 def print_help():
     print(
-        """\tls - see all recordings\n\tsearch - query for recordings\n\tadd - add new recording\n\tsave - save to db\n\trm - delete recording(only from db)\n\tplay - play recording\n\tedit - edit recrding's metadata\n\tq - quit\n\thelp - this help"""
+        """\tls - see all recordings\n\tsearch - query for recordings\n\tadd - add new recording\n\tsave - save to db\n\trm - delete recording(only from db)\n\tq - quit\n\thelp - this help"""
     )
+
+
+def search(rec_file):
+    if len(rec_file) == 0:
+        print(f"{PROMPT}no recordings in db")
+        return []
+
+    search_rec = {}
+    chosen_attributes = get_from_options("attributes", list(rec_file[0].keys()))
+    for attribute in chosen_attributes:
+        possible_values = sorted(filter(not_empty, map(get_attr(attribute), rec_file)))
+        possible_values = list(k for k, _ in itertools.groupby(possible_values))
+        print(possible_values)
+        if possible_values == []:
+            print(f"no options for {attribute}")
+            continue
+        values = get_from_options(attribute, possible_values)
+        if values == [""]:
+            print(f"no options for {attribute}")
+            continue
+        search_rec[attribute] = values
+
+    possible_searchs = []
+    for rec in rec_file:
+        is_pass = True
+        for key, val in search_rec.items():
+            if rec[key] not in val:
+                is_pass = False
+                break
+        if is_pass:
+            possible_searchs.append(rec)
+
+    return get_from_options("search results", possible_searchs, accept_empty=True)
+
+
+def view(rec, rec_file):
+    print(rec)
+    while True:
+        action = get_from_options(
+            "what do?", ["play", "edit", "return"], accept_empty=True
+        )
+        if action == []:
+            continue
+        action = action[0]
+        match action:
+            case "play":
+                if not_empty(rec["audio_file"]):
+                    playsound(rec["audio_file"][0])
+                else:
+                    print("no audio!")
+            case "edit":
+                chosen_attributes = get_from_options("attributes", list(rec.keys()))
+                for attribute in chosen_attributes:
+                    match attribute:
+                        case "tempo":
+                            rec["tempo"] = get_tempo()
+                        case "audio_file":
+                            rec["audio_file"] = get_files_from_curdir(
+                                "audio_file",
+                                partial(check_audio_file, rec_file, AUDIO_FORMATS),
+                            )
+                        case "score_file":
+                            rec["score_file"] = get_files_from_curdir(
+                                "score_file",
+                                partial(check_audio_file, rec_file, SCORE_FORMATS),
+                            )
+                        case "chords":
+                            rec["chords"] = get_chords()
+                        case "has_line":
+                            rec["has_line"] = (
+                                True
+                                if get_from_options(
+                                    "has line", ["no", "yes"], default="no"
+                                )
+                                == ["yes"]
+                                else False
+                            )
+                        case "feel":
+                            rec["feel"] = get_feels()
+                        case "composer":
+                            rec["composer"] = get_from_options(
+                                "composer",
+                                list(
+                                    set(e for rec in rec_file for e in rec["composer"])
+                                ),
+                                add_new=True,
+                            )
+                        case "used":
+                            rec["used"] = get_from_options(
+                                "compsitions using this progression",
+                                list(set(e for rec in rec_file for e in rec["used"])),
+                                add_new=True,
+                                accept_empty=True,
+                            )
+                        case "length":
+                            rec["length"] = try_until_good(get_length)
+                        case "time_signature":
+                            rec["time_signature"] = get_time_signature()
+            case "return":
+                return
 
 
 def main():
@@ -162,19 +256,17 @@ def main():
                 for chords in get_recs_chords(rec_file):
                     print(chords)
             case "search":
-                pass
+                result = search(rec_file)
+                if result != []:
+                    view(result[0], rec_file)
+                else:
+                    print(f"{PROMPT}no recording suits your search")
             case "add":
                 rec_file.append(add_new_composition(rec_file))
+                save_recs(rec_file)
             case "rm":
                 delete = get_from_options("recs", get_recs_chords(rec_file))
                 rec_file = list(filter(lambda rec: rec["name"] != delete, rec_file))
-            case "play":
-                play = get_from_options("recs", get_recs_chords(rec_file))
-                for rec in rec_file:
-                    if rec["name"] == play:
-                        playsound(rec["audio_file"])
-            case "edit":
-                pass
             case "save":
                 save_recs(rec_file)
             case "help":
@@ -183,79 +275,6 @@ def main():
                 save_recs(rec_file)
             case _:
                 print_help()
-
-
-def dowhile(action, check, accumulate=False):
-    thing = [] if accumulate else None
-    while True:
-        if accumulate:
-            thing.append(action())
-        else:
-            thing = action()
-        if check(thing):
-            break
-    return thing
-
-
-def get_from_options(
-    category_name,
-    options,
-    add_new=False,
-    accept_empty=False,
-    default="",
-):
-    accept_empty = accept_empty or default != ""
-    ALLOW_MULTIPLE_NOTIFY_MSG = "(enter space seperated list if multiple choices)"
-    if default not in options and default != "":
-        raise ValueError("default value has to be one of the options if it is given")
-    elif default != "" and default in options:
-        options[options.index(default)] = (
-            "[" + options[options.index(default)].upper() + "]"
-        )
-    if add_new:
-        options.append("new")
-    prompt_prefix = f">>> {category_name} - {ALLOW_MULTIPLE_NOTIFY_MSG}"
-    optionlist = "\n".join([f"\t{n} - {option}" for n, option in enumerate(options)])
-    prompt = f"{prompt_prefix}\n{optionlist}\n{PROMPT}"
-
-    result = None
-    while True:
-        result = input(prompt)
-        if result == "" and not accept_empty:
-            print("please try again retard")
-            continue
-        if not all(map(lambda x: x.isdigit(), result.split())):
-            print("please try again retard")
-            continue
-        results = list(map(int, result.split()))
-        if not all(map(lambda x: x < len(options), results)):
-            print("please try again retard")
-            continue
-
-        if result == "" and accept_empty:
-            return [default]
-
-        text_results = []
-        for entry in results:
-            if options[entry] == "new":
-                text_results.append(input(f"enter new {category_name} - "))
-            else:
-                text_results.append(options[entry])
-        return text_results
-
-
-def get_until_empty(category, options="", check=None):
-    options_list = "\n".join(options)
-    return list(
-        filter(
-            lambda x: x != "",
-            dowhile(
-                lambda: input(f"{PROMPT}{category} - \n\t{options_list}"),
-                lambda things: things[-1] == "",
-                True,
-            ),
-        )
-    )
 
 
 if __name__ == "__main__":
