@@ -1,0 +1,13 @@
+Amaj7, 
+Caug+7, 
+Dbm7, 
+Fmaj7, 
+B7, 
+Bm7, 
+Em7, 
+E7, 
+Bb5-7, 
+G7, 
+loop ×3:
+Cm7/Ab, Adim7/F, (G7/B, G7/C, G7/A)
+A7

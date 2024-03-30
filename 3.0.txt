@@ -1,0 +1,16 @@
+first:
+Gm, F, Eb, D
+(notes go something like
+G (trill) A (trill) Bb C Bb A F# G)
+(second time they go like:
+G (trill) A (trill) Bb C D Eb F# G)
+
+second:
+Dm, Bdim7, C#dim, A7, Am7, F#dim, G, G3dim
+(notes go like:
+F->D->E->C#->E->C->D->D)
+
+
+third:
+chords like first
+(notes like first just going into Eb too)

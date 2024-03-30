@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import itertools
+import shutil
 import json
 import os
 import pdb
@@ -22,8 +23,11 @@ TEMPI = ["fast", "mid", "slow"]
 
 """
     TODO:
-1. make audio playing seekable
-2. 
+1. turn audio file to a list of audios
+2. when editing - enable to append data to the list
+2. use schema? - have everything be list of [list of] strings?
+3. let users bail while inputing new composition(no ctrl-c)
+4. add rating
 """
 
 
@@ -41,15 +45,16 @@ def get_feels():
     while True:
         choices = get_from_options("feels", keys_list, accept_empty=True)
         if choices == [""]:
-            break
+            return final_choices
         for choice in choices:
             for emotion in get_from_options(
                 choice, EMOTIONS[choice], accept_empty=True
             ):
                 final_choices.append(emotion)
-        if len(final_choices) > 0 and final_choices[-1] == [""]:
-            final_choices = final_choices[:-1]
-            break
+        if not (len(final_choices) > 0 and final_choices[-1] == [""]):
+            continue
+        final_choices = final_choices[:-1]
+        break
     return final_choices
 
 
@@ -78,23 +83,26 @@ def get_time_signature():
 
 
 def get_length():
-    return float(input(f"{PROMPT}length - "))
+    return list(map(float, input(f"{PROMPT}length - ").split(' ')))
 
 
 def check_audio_file(rec_file, extension_list, filename):
-    return (
-        filename not in [s["audio_file"] for s in rec_file]
+        # don't ask
+        list_of_recs = list(chain(*list(chain([rec["audio_file"] for rec in rec_file]))))
+        return (
+        filename not in list_of_recs
         and os.path.splitext(filename)[1] in extension_list
     )
 
 
 def add_new_composition(rec_file):
-    tempo = get_tempo()
     audio_file = get_files_from_curdir(
         "audio_file", partial(check_audio_file, rec_file, AUDIO_FORMATS)
     )
+    print(audio_file)
+    tempo = get_tempo()
     score_file = get_files_from_curdir(
-        "score_file", partial(check_audio_file, rec_file, SCORE_FORMATS)
+        "score_file", partial(check_audio_file, rec_file, SCORE_FORMATS), True
     )
     chords = get_chords()
     has_line = (
@@ -154,8 +162,10 @@ def search(rec_file):
     chosen_attributes = get_from_options("attributes", list(rec_file[0].keys()))
     for attribute in chosen_attributes:
         possible_values = sorted(filter(not_empty, map(get_attr(attribute), rec_file)))
+        if attribute == "feel":
+            possible_values = chain(*possible_values)
+        # filter duplicates
         possible_values = list(k for k, _ in itertools.groupby(possible_values))
-        print(possible_values)
         if possible_values == []:
             print(f"no options for {attribute}")
             continue
@@ -169,7 +179,11 @@ def search(rec_file):
     for rec in rec_file:
         is_pass = True
         for key, val in search_rec.items():
-            if rec[key] not in val:
+            if key == "feel":
+                if not any(map(lambda feel: feel in val,rec[key])):
+                    is_pass = False
+                    break
+            elif rec[key] not in val:
                 is_pass = False
                 break
         if is_pass:
@@ -262,7 +276,11 @@ def main():
                 else:
                     print(f"{PROMPT}no recording suits your search")
             case "add":
-                rec_file.append(add_new_composition(rec_file))
+                new_composition = add_new_composition(rec_file)
+                # rename = True if input("rename file? y/[n]") == 'y' else False
+                # if rename:
+                #     shutil.move(str(new_composition["audio_file"]),str(new_composition["chords"]))
+                rec_file.append(new_composition)
                 save_recs(rec_file)
             case "rm":
                 delete = get_from_options("recs", get_recs_chords(rec_file))

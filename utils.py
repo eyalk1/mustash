@@ -33,17 +33,15 @@ def dowhile(action, check, accumulate=False):
     return thing
 
 
-def get_files_from_curdir(filetype: str, pred):
+def get_files_from_curdir(filetype: str, pred, accept_empty=False):
     files = list(
         filter(
-            lambda filename: filename != "mustash.py"
-            and filename != REC_FILENAME
-            and os.path.isfile(filename)
+            lambda filename: os.path.isfile(filename)
             and pred(filename),
-            os.listdir(),
+            sorted(os.listdir()),
         )
     )
-    return get_from_options(filetype, files, accept_empty=True)
+    return get_from_options(filetype, files, accept_empty=accept_empty)
 
 
 def get_from_options(
@@ -52,6 +50,7 @@ def get_from_options(
     add_new=False,
     accept_empty=False,
     default="",
+    accept_single=False
 ):
     if options == []:
         return []
@@ -86,6 +85,8 @@ def get_from_options(
         if result == "" and accept_empty:
             return [default]
 
+        if accept_single:
+            return options[results[0]]
         text_results = []
         for entry in results:
             if options[entry] == "new":
